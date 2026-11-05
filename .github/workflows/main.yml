@@ -7,24 +7,91 @@ on:
   workflow_dispatch:
 
 jobs:
+
   build:
-    name: Build and Validate
+    name: Build Java WAR
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
-          python-version: '3.11'
+          distribution: temurin
+          java-version: '21'
+          cache: maven
 
-      - name: Install Dependencies
-        run: pip install -r requirements.txt
+      - name: Build WAR
+        run: mvn clean package
 
-      - name: Validate Python Code
-        run: python -m py_compile backend/app.py
+      - name: Upload WAR Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hospital-war
+          path: target/medicore-hospital.war
 
-      - name: Build Successful
-        run: echo "CarePlus Hospital Build Successful!"
+  deploy-dev:
+    name: Deploy to DEV
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hospital-war
+
+      - name: Deploy DEV
+        run: |
+          curl --fail --show-error --user "${{ secrets.TOMCAT_USER_DEV }}:${{ secrets.TOMCAT_PASS_DEV }}" \
+          --upload-file medicore-hospital.war \
+          "${{ secrets.TOMCAT_URL_DEV }}/deploy?path=/medicore-hospital&update=true"
+
+  deploy-test:
+    name: Deploy to TEST
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hospital-war
+
+      - name: Deploy TEST
+        run: |
+          curl --fail --show-error --user "${{ secrets.TOMCAT_USER_TEST }}:${{ secrets.TOMCAT_PASS_TEST }}" \
+          --upload-file medicore-hospital.war \
+          "${{ secrets.TOMCAT_URL_TEST }}/deploy?path=/medicore-hospital&update=true"
+
+  deploy-preprod:
+    name: Deploy to PRE-PROD
+    needs: deploy-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hospital-war
+
+      - name: Deploy PRE-PROD
+        run: |
+          curl --fail --show-error --user "${{ secrets.TOMCAT_USER_PRE_PROD }}:${{ secrets.TOMCAT_PASS_PRE_PROD }}" \
+          --upload-file medicore-hospital.war \
+          "${{ secrets.TOMCAT_URL_PRE_PROD }}/deploy?path=/medicore-hospital&update=true"
+
+  deploy-prod:
+    name: Deploy to PROD
+    needs: deploy-preprod
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hospital-war
+
+      - name: Deploy PROD
+        run: |
+          curl --fail --show-error --user "${{ secrets.TOMCAT_USER_PROD }}:${{ secrets.TOMCAT_PASS_PROD }}" \
+          --upload-file medicore-hospital.war \
+          "${{ secrets.TOMCAT_URL_PROD }}/deploy?path=/medicore-hospital&update=true"
