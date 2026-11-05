@@ -21,12 +21,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install Dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Validate Python Code
-        run: |
-          python -m py_compile backend/app.py
+        run: python -m py_compile backend/app.py
 
       - name: Build Successful
         run: echo "CarePlus Hospital Build Successful!"
